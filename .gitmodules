@@ -1,3 +1,0 @@
-[submodule "privacy"]
-	path = privacy
-	url = https://github.com/tensorflow/privacy.git
