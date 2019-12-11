@@ -72,13 +72,13 @@ def make_optimizer_class(cls):
                           loss,
                           var_list,
                           gate_gradients=GATE_OP,
+                          public_data=None,
                           aggregation_method=None,
                           colocate_gradients_with_ops=False,
                           grad_loss=None,
                           gradient_tape=None):
-      if callable(loss):
-        print("Eager mode")
 
+      if callable(loss):
         # TF is running in Eager mode, check we received a vanilla tape.
         if not gradient_tape:
           raise ValueError('When in Eager mode, a tape needs to be passed.')
@@ -91,6 +91,16 @@ def make_optimizer_class(cls):
                                          [self._num_microbatches, -1])
         sample_params = (
             self._dp_sum_query.derive_sample_params(self._global_state))
+
+        if public_data and gradient_tape:
+          public_grads = []
+          for public_x, public_y in public_data:
+            loss_value = loss_fn(public_y, model(public_x))
+            grad = tape.gradient(gradient_tape, var_list)
+            print(grad)
+            public_grads.append(grads)
+
+        print(public_grads)
 
         def process_microbatch(i, sample_state):
           """Process one microbatch (record) with privacy helper."""
