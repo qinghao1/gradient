@@ -195,6 +195,7 @@ def main(unused_argv):
   # Training loop.
   steps_per_epoch = 60000 // FLAGS.batch_size
   for epoch in range(1, FLAGS.epochs + 1):
+    print('Training epoch %d' % epoch)
     # Train the model for one epoch.
     mnist_classifier.train(input_fn=train_input_fn, steps=steps_per_epoch)
 

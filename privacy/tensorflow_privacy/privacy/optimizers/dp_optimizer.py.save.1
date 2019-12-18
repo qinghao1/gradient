@@ -75,10 +75,11 @@ def make_optimizer_class(cls):
                           aggregation_method=None,
                           colocate_gradients_with_ops=False,
                           grad_loss=None,
-                          gradient_tape=None,
-                          layer_norm_clips=None,
-                          weight_val_clips=None):
+                          gradient_tape=None):
+
       if callable(loss):
+        print("Eager mode")
+
         # TF is running in Eager mode, check we received a vanilla tape.
         if not gradient_tape:
           raise ValueError('When in Eager mode, a tape needs to be passed.')
@@ -92,36 +93,25 @@ def make_optimizer_class(cls):
         sample_params = (
             self._dp_sum_query.derive_sample_params(self._global_state))
 
-        def process_microbatch(i, sample_state,
-                               layer_norm_clips, weight_val_clips):
+        if public_data and loss_fn:
+          public_grads = []
+          for public_x, public_y in public_data:
+            loss_value = loss_fn(public_y, model(public_x))
+            grad = tape.gradient(gradient_tape, var_list)
+            print(grad)
+            public_grads.append(grads)
+
+        def process_microbatch(i, sample_state):
           """Process one microbatch (record) with privacy helper."""
           microbatch_loss = tf.reduce_mean(
               input_tensor=tf.gather(microbatches_losses, [i]))
           grads = gradient_tape.gradient(microbatch_loss, var_list)
-
-          if layer_norm_clips is not None:
-            # Clip grads by layer norms
-            for i, layer in enumerate(grads):
-              grads[i] = tf.clip_by_norm(
-                              layer,
-                              layer_norm_clips[i])
-
-          if weight_val_clips is not None:
-            # Clip individual weights by value
-            for i, layer in enumerate(grads):
-              grads[i] = tf.clip_by_value(
-                              layer,
-                              -weight_val_clips[i],
-                              weight_val_clips[i])
-
           sample_state = self._dp_sum_query.accumulate_record(
               sample_params, sample_state, grads)
           return sample_state
 
         for idx in range(self._num_microbatches):
-          sample_state = process_microbatch(idx, sample_state,
-                                            layer_norm_clips,
-                                            weight_val_clips)
+          sample_state = process_microbatch(idx, sample_state)
 
         grad_sums, self._global_state = (
             self._dp_sum_query.get_noised_result(
@@ -136,6 +126,8 @@ def make_optimizer_class(cls):
         return grads_and_vars
 
       else:
+        print("Graph mode")
+
         # TF is running in graph mode, check we did not receive a gradient tape.
         if gradient_tape:
           raise ValueError('When in graph mode, a tape should not be passed.')
@@ -159,19 +151,16 @@ def make_optimizer_class(cls):
               tf.reduce_mean(input_tensor=tf.gather(
                   microbatches_losses, [i])), var_list, gate_gradients,
               aggregation_method, colocate_gradients_with_ops, grad_loss))
-
-          # Pre-clip
-          if gradient_clips is not None:
-            # Clip grads by layer
-            for i, layer in enumerate(grads):
-              grads[i] = tf.clip_by_norm(
-                              layer,
-                              gradient_clips[i])
-
           grads_list = [
               g if g is not None else tf.zeros_like(v)
               for (g, v) in zip(list(grads), var_list)
           ]
+
+          print(grads)
+          print()
+          print(grads_list)
+          # TODO: Pre-clip
+
 
           # Global clip here
           sample_state = self._dp_sum_query.accumulate_record(
