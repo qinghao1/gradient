@@ -43,6 +43,7 @@ def make_optimizer_class(cls):
     def __init__(
         self,
         dp_sum_query,
+        noise_multiplier,
         num_microbatches=None,
         unroll_microbatches=False,
         *args,  # pylint: disable=keyword-arg-before-vararg, g-doc-args
@@ -62,6 +63,7 @@ def make_optimizer_class(cls):
       super(DPOptimizerClass, self).__init__(*args, **kwargs)
       self._dp_sum_query = dp_sum_query
       self._num_microbatches = num_microbatches
+      self._noise_multiplier = noise_multiplier
       self._global_state = self._dp_sum_query.initial_global_state()
       # TODO(b/122613513): Set unroll_microbatches=True to avoid this bug.
       # Beware: When num_microbatches is large (>100), enabling this parameter
@@ -77,7 +79,12 @@ def make_optimizer_class(cls):
                           grad_loss=None,
                           gradient_tape=None,
                           layer_norm_clips=None,
-                          weight_val_clips=None):
+                          weight_val_clips=None,
+                          new_l2_norm_clip=None):
+      if new_l2_norm_clip is not None:
+        self._dp_sum_query._l2_norm_clip = new_l2_norm_clip
+        self._dp_sum_query._stddev = new_l2_norm_clip * self._noise_multiplier
+
       if callable(loss):
         # TF is running in Eager mode, check we received a vanilla tape.
         if not gradient_tape:
@@ -237,6 +244,7 @@ def make_gaussian_optimizer_class(cls):
 
       super(DPGaussianOptimizerClass, self).__init__(
           dp_sum_query,
+          noise_multiplier,
           num_microbatches,
           unroll_microbatches,
           *args,
