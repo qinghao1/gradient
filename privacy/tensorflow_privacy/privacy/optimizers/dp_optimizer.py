@@ -84,6 +84,8 @@ def make_optimizer_class(cls):
       if new_l2_norm_clip is not None:
         self._dp_sum_query._l2_norm_clip = new_l2_norm_clip
         self._dp_sum_query._stddev = new_l2_norm_clip * self._noise_multiplier
+        self._global_state = self._dp_sum_query.make_global_state(
+          new_l2_norm_clip, new_l2_norm_clip * self._noise_multiplier)
 
       if callable(loss):
         # TF is running in Eager mode, check we received a vanilla tape.
