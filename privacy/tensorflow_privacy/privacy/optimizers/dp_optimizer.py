@@ -169,14 +169,6 @@ def make_optimizer_class(cls):
                   microbatches_losses, [i])), var_list, gate_gradients,
               aggregation_method, colocate_gradients_with_ops, grad_loss))
 
-          # Pre-clip
-          if gradient_clips is not None:
-            # Clip grads by layer
-            for i, layer in enumerate(grads):
-              grads[i] = tf.clip_by_norm(
-                              layer,
-                              gradient_clips[i])
-
           grads_list = [
               g if g is not None else tf.zeros_like(v)
               for (g, v) in zip(list(grads), var_list)
