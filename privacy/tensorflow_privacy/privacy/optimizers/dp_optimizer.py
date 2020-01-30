@@ -80,7 +80,8 @@ def make_optimizer_class(cls):
                           gradient_tape=None,
                           layer_norm_clips=None,
                           weight_val_clips=None,
-                          new_l2_norm_clip=None):
+                          new_l2_norm_clip=None,
+                          layer_multipliers=None):
       if new_l2_norm_clip is not None:
         self._dp_sum_query._l2_norm_clip = new_l2_norm_clip
         self._dp_sum_query._stddev = new_l2_norm_clip * self._noise_multiplier
@@ -102,11 +103,17 @@ def make_optimizer_class(cls):
             self._dp_sum_query.derive_sample_params(self._global_state))
 
         def process_microbatch(i, sample_state,
-                               layer_norm_clips, weight_val_clips):
+                               layer_norm_clips,
+                               weight_val_clips,
+                               layer_multipliers):
           """Process one microbatch (record) with privacy helper."""
           microbatch_loss = tf.reduce_mean(
               input_tensor=tf.gather(microbatches_losses, [i]))
           grads = gradient_tape.gradient(microbatch_loss, var_list)
+
+          if layer_multipliers is not None:
+            for i, multiplier in enumerate(layer_multipliers):
+              grads[i] *= multiplier
 
           if layer_norm_clips is not None:
             # Clip grads by layer norms
@@ -130,7 +137,8 @@ def make_optimizer_class(cls):
         for idx in range(self._num_microbatches):
           sample_state = process_microbatch(idx, sample_state,
                                             layer_norm_clips,
-                                            weight_val_clips)
+                                            weight_val_clips,
+                                            layer_multipliers)
 
         grad_sums, self._global_state = (
             self._dp_sum_query.get_noised_result(
@@ -140,6 +148,10 @@ def make_optimizer_class(cls):
           return v / tf.cast(self._num_microbatches, tf.float32)
 
         final_grads = tf.nest.map_structure(normalize, grad_sums)
+
+        if layer_multipliers is not None:
+            for i, multiplier in enumerate(layer_multipliers):
+              final_grads[i] /= multiplier
 
         grads_and_vars = list(zip(final_grads, var_list))
         return grads_and_vars
