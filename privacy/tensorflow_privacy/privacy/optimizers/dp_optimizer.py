@@ -111,10 +111,6 @@ def make_optimizer_class(cls):
               input_tensor=tf.gather(microbatches_losses, [i]))
           grads = gradient_tape.gradient(microbatch_loss, var_list)
 
-          if layer_multipliers is not None:
-            for i, multiplier in enumerate(layer_multipliers):
-              grads[i] *= multiplier
-
           if layer_norm_clips is not None:
             # Clip grads by layer norms
             for i, layer in enumerate(grads):
@@ -129,6 +125,10 @@ def make_optimizer_class(cls):
                               layer,
                               -weight_val_clips[i],
                               weight_val_clips[i])
+
+          if layer_multipliers is not None:
+            for i, multiplier in enumerate(layer_multipliers):
+              grads[i] /= multiplier
 
           sample_state = self._dp_sum_query.accumulate_record(
               sample_params, sample_state, grads)
@@ -151,7 +151,7 @@ def make_optimizer_class(cls):
 
         if layer_multipliers is not None:
             for i, multiplier in enumerate(layer_multipliers):
-              final_grads[i] /= multiplier
+              final_grads[i] *= multiplier
 
         grads_and_vars = list(zip(final_grads, var_list))
         return grads_and_vars
