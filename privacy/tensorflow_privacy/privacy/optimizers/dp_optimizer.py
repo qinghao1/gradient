@@ -81,7 +81,8 @@ def make_optimizer_class(cls):
                           layer_norm_clips=None,
                           weight_val_clips=None,
                           new_l2_norm_clip=None,
-                          layer_multipliers=None):
+                          layer_multipliers=None,
+                          return_signs=False):
       if new_l2_norm_clip is not None:
         self._dp_sum_query._l2_norm_clip = new_l2_norm_clip
         self._dp_sum_query._stddev = new_l2_norm_clip * self._noise_multiplier
@@ -148,6 +149,9 @@ def make_optimizer_class(cls):
           return v / tf.cast(self._num_microbatches, tf.float32)
 
         final_grads = tf.nest.map_structure(normalize, grad_sums)
+
+        if return_signs:
+          final_grads = tf.nest.map_structure(tf.math.sign, final_grads)
 
         if layer_multipliers is not None:
             for i, multiplier in enumerate(layer_multipliers):
