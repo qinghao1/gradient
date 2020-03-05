@@ -83,7 +83,7 @@ def compute_dp_sgd_privacy(n, batch_size, noise_multiplier, epochs, delta):
   if q > 1:
     raise app.UsageError('n must be larger than the batch size.')
   orders = ([1.25, 1.5, 1.75, 2., 2.25, 2.5, 3., 3.5, 4., 4.5] +
-            list(range(5, 64)) + [128, 256, 512])
+            list(range(5, 64)) + list([2**i for i in range(7, 20)]))
   steps = int(math.ceil(epochs * n / batch_size))
 
   return apply_dp_sgd_analysis(q, noise_multiplier, steps, orders, delta)
