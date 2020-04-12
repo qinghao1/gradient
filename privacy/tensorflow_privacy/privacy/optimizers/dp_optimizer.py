@@ -82,7 +82,8 @@ def make_optimizer_class(cls):
                           weight_val_clips=None,
                           new_l2_norm_clip=None,
                           layer_multipliers=None,
-                          return_signs=False):
+                          return_signs=False,
+                          return_grads_only=False):
       if new_l2_norm_clip is not None:
         self._dp_sum_query._l2_norm_clip = new_l2_norm_clip
         self._dp_sum_query._stddev = new_l2_norm_clip * self._noise_multiplier
@@ -157,8 +158,11 @@ def make_optimizer_class(cls):
             for i, multiplier in enumerate(layer_multipliers):
               final_grads[i] *= multiplier
 
-        grads_and_vars = list(zip(final_grads, var_list))
-        return grads_and_vars
+        if return_grads_only:
+          return final_grads
+        else:
+          grads_and_vars = list(zip(final_grads, var_list))
+          return grads_and_vars
 
       else:
         # TF is running in graph mode, check we did not receive a gradient tape.
